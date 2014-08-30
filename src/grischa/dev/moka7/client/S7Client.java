@@ -13,7 +13,6 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  *
@@ -27,21 +26,15 @@ public class S7Client extends S7Telegram {
     private DataOutputStream outStream;
     private boolean connected = false;
 
-    private static final Logger logger = Logger.getLogger(S7Client.class.getName());
-
-    private byte connectionType = 0x02;
+    private short connectionType = S7.PG;
     private int rack = 0;
     private int slot = 2;
 
-    private byte[] PDU = new byte[2048];
+    private static byte[] buffer = null;
+    final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
+
     private int Address = 0;
-    private int NumElements = 0;
-    private int MaxElements = 0;
-    private int TotElements = 0;
-    private int SizeRequested = 0;
     private int Length = 0;
-    private int Offset = 0;
-    private int WordSize = 0;
 
     public S7Client() {
 
@@ -54,9 +47,8 @@ public class S7Client extends S7Telegram {
     }
 
     /**
-     * Specify a valid IpAddress that connect to a PLC, HMI and so on If you
-     * want to use another Port you have to read the manual cause that have some
-     * important information for this.
+     * Specify a valid IpAddress that connect to a PLC, HMI and so on If you want to use another Port you have
+     * to read the manual cause that have some important information for this.
      *
      * @param ipAddress -specfiy the ipAddress (PLC)
      * @param isoTcpPort -The Standart isoTcpPort is 102.
@@ -77,9 +69,9 @@ public class S7Client extends S7Telegram {
                 outStream = new DataOutputStream(socket.getOutputStream());
 
                 setConnectionParams(connectionType, rack, slot);
-                
+
                 // Second: ISO-Connection
-                sendRequest(ISO_CR, ISO_CR.length, outStream);           // Send the ConnectionRequest-Package
+                sendRequest(ISO_CR, outStream);                         // Send the ConnectionRequest-Package
                 size = RecvIsoPacket(inStream);                          // Gets the reply (if any)
                 if (size == 22) {
                     if (getLastPDUType() != (byte) 0xD0) {
@@ -96,12 +88,9 @@ public class S7Client extends S7Telegram {
             } catch (IOException ex) {
                 logger.log(Level.WARNING, "TCP Connection Failed.", ex);
                 return;
-            } catch (InterruptedException ex) {
-                logger.log(Level.WARNING, "Interrupped Exception", ex);
             }
             System.out.println("Connect to " + ipAddress + " :" + isoTcpPort);
-            System.out.println("Negotiate PDU: " +size);
-            
+            System.out.println("Negotiate PDU: " + size);
 
         }
 
@@ -125,12 +114,29 @@ public class S7Client extends S7Telegram {
 //        }
 //        return 0;
 //    }  
-    public void ReadArea(int Area, int DBNumber, int Start, int Amount, byte[] Data) throws ISOException, IOException, InterruptedException {
-        WordSize = 1;
-        Length = 0;
+    /**
+     * Starts to Read the buffer at postion 0 and reads the Data up to the value that the S7Blockinfo deliver.
+     *
+     * @param Area Decribes the Kind of S7FunctionsBlock S7AreaPE = 0x81 (Input Adress) S7AreaPA = 0x82
+     * (Output Adress) S7AreaMK = 0x83 (Merker) S7AreaDB = 0x84 (Datablock) S7AreaCT = 0x1C (Counter) S7AreaTM
+     * = 0x1D (Timer)
+     * @param DBNumber Thats the internal Number of (PE,PA,MK,CT,TM) from the PLC.
+     * @return - byte Array that contains the Data
+     */
+    public byte[] ReadArea(int Area, int DBNumber) {
+        buffer = new byte[65536];
+        int start = 0;
+        int lenToRead = 31;
+        int offset = 0;
+        int SizeRequested = 0;
+        int NumElements = 0;
+        int MaxElements = 0;
+        int TotElements = 0;
+        
+        S7BlockInfo block = GetAgBlockInfo(S7.Block_DB, DBNumber);
 
-        MaxElements = (getPduLength() - 18) / WordSize; // 18 = Reply telegram header
-        TotElements = Amount;
+        MaxElements = getPduLength() - 18;              // 18 = Reply telegram header
+        TotElements = block.MC7Size();                  // Size from Datablock
 
         while (TotElements > 0) {
             NumElements = TotElements;
@@ -138,39 +144,43 @@ public class S7Client extends S7Telegram {
                 NumElements = MaxElements;
             }
 
-            SizeRequested = NumElements * WordSize;
+            SizeRequested = NumElements;
 
             // Setup the telegram
-            System.arraycopy(S7_RW, 0, PDU, 0, LENGTH_READ);
+            System.arraycopy(S7_RW, 0, PDU, 0, lenToRead);
             PDU[27] = (byte) Area;                      // Set DB Number 
             S7.SetWordAt(PDU, 25, DBNumber);            // Set Area         
             S7.SetWordAt(PDU, 23, NumElements);         // Num elements                             
 
             // Address into the PLC (only 3 bytes)           
-            PDU[30] = (byte) (Start << 3 & 0x0FF);  // Adjusts Start and word length
+            PDU[30] = (byte) (start << 3 & 0x0FF);  // Adjusts Start and word length
             Address = Address >> 8;
-            PDU[29] = (byte) (Start << 3 & 0x0FF);  // Adjusts Start and word length
+            PDU[29] = (byte) (start << 3 & 0x0FF);  // Adjusts Start and word length
             Address = Address >> 8;
-            PDU[28] = (byte) (Start << 3 & 0x0FF);  // Adjusts Start and word length
+            PDU[28] = (byte) (start << 3 & 0x0FF);  // Adjusts Start and word length
+            try {
+                sendRequest(PDU, lenToRead, outStream);
 
-            sendRequest(PDU, LENGTH_READ, outStream);
+                Length = RecvIsoPacket(inStream);
 
-            Length = RecvIsoPacket(inStream);
-
-            if (Length - 25 == SizeRequested && PDU[21] == (byte) 0xFF && Length >= 25) {
-                System.arraycopy(PDU, 25, Data, Offset, SizeRequested);
-                Offset += SizeRequested;
-            } else {
-                throw new ISOException("errS7DataRead");
+                if (Length - 25 == SizeRequested && PDU[21] == (byte) 0xFF && Length >= 25) {
+                    System.arraycopy(PDU, 25, buffer, offset, SizeRequested);
+                    offset += SizeRequested;
+                } else {
+                    throw new ISOException("S7DataRead");
+                }
+            } catch (IOException ex) {
+                System.out.println("23");
             }
 
             TotElements -= NumElements;
-            Start += NumElements * WordSize;
+            start += NumElements;
         }
+        return buffer;
     }
 
     @SuppressWarnings("UnnecessaryReturnStatement")
-    public void GetAgBlockInfo(int BlockType, int BlockNumber) {
+    public S7BlockInfo GetAgBlockInfo(int BlockType, int BlockNumber) {
         S7BlockInfo blockinfo = new S7BlockInfo();
 
         // Block Type
@@ -186,11 +196,12 @@ public class S7Client extends S7Telegram {
         BlockNumber = BlockNumber % 10;
         S7_BI[35] = (byte) ((BlockNumber / 1) + 0x30);
         try {
-            sendRequest(S7_BI, S7_BI.length, outStream);
+
+            sendRequest(S7_BI, outStream);
             Length = RecvIsoPacket(inStream);
             if (Length > 32) // the minimum expected
             {
-                if ( S7.GetWordAt(PDU,27)==0 && PDU[29]==(byte)0xFF ) {
+                if (S7.GetWordAt(PDU, 27) == 0 && PDU[29] == (byte) 0xFF) {
                     blockinfo.Update(PDU, 42);
                 } else {
                     throw new ISOException("errS7FunctionError");
@@ -201,98 +212,79 @@ public class S7Client extends S7Telegram {
 
         } catch (ISOException ex) {
             logger.log(Level.SEVERE, "ISO Communication Error.", ex);
-            return;
+            return null;
         } catch (IOException ex) {
             logger.log(Level.WARNING, "TCP Connection Failed.", ex);
-            return;
-        } catch (InterruptedException ex) {
-            logger.log(Level.WARNING, "Interrupped Exception", ex);
-            return;
+            return null;
         }
-
-
+        return blockinfo;
     }
 
-    public int readCounter(int Area, int DBNumber, int Start, int Amount, byte[] Data) throws ISOException, IOException, InterruptedException {
-        WordSize = 2;
+//    public int readCounter(int Area, int DBNumber, int Start, int Amount, byte[] Data) throws ISOException, IOException, InterruptedException {
+//        WordSize = 2;
+//        int lengthRead = 31;
+//
+//        MaxElements = (getPduLength() - 18) / WordSize; // 18 = Reply telegram header
+//        TotElements = Amount;
+//
+//        while (TotElements > 0) {
+//            NumElements = TotElements;
+//            if (NumElements > MaxElements) {
+//                NumElements = MaxElements;
+//            }
+//             Setup the telegram
+//            System.arraycopy(S7_RW, 0, PDU, 0, lengthRead);
+//             Set DB Number
+//            PDU[27] = (byte) Area;
+//            PDU[22] = (byte) 0x1C;
+//
+//            SizeRequested = NumElements * WordSize;
+//             Num elements
+//            S7.SetWordAt(PDU, 23, NumElements);
+//             Address into the PLC (only 3 bytes)           
+//            PDU[30] = (byte) (Start & 0x0FF);
+//            Address = Address >> 8;
+//            PDU[29] = (byte) (Start & 0x0FF);
+//            Address = Address >> 8;
+//            PDU[28] = (byte) (Start & 0x0FF);
+//
+//            sendRequest(PDU, lengthRead, outStream);
+//
+//            Length = RecvIsoPacket(inStream);
+//
+//            if ((Length - 25 == SizeRequested) && (PDU[21] == (byte) 0xFF) && Length >= 25) {
+//                System.arraycopy(PDU, 25, Data, Offset, SizeRequested);
+//                Offset += SizeRequested;
+//            } else {
+//                throw new ISOException("errS7CounterRead");
+//            }
+//            TotElements -= NumElements;
+//            Start += NumElements * WordSize;
+//        }
+//        return 11111;
+//    }
 
-        MaxElements = (getPduLength() - 18) / WordSize; // 18 = Reply telegram header
-        TotElements = Amount;
-
-        while (TotElements > 0) {
-            NumElements = TotElements;
-            if (NumElements > MaxElements) {
-                NumElements = MaxElements;
-            }
-            // Setup the telegram
-            System.arraycopy(S7_RW, 0, PDU, 0, LENGTH_READ);
-            // Set DB Number
-            PDU[27] = (byte) Area;
-            PDU[22] = (byte) 0x1C;
-
-            SizeRequested = NumElements * WordSize;
-            // Num elements
-            S7.SetWordAt(PDU, 23, NumElements);
-            // Address into the PLC (only 3 bytes)           
-            PDU[30] = (byte) (Start & 0x0FF);
-            Address = Address >> 8;
-            PDU[29] = (byte) (Start & 0x0FF);
-            Address = Address >> 8;
-            PDU[28] = (byte) (Start & 0x0FF);
-
-            sendRequest(PDU, LENGTH_READ, outStream);
-
-            Length = RecvIsoPacket(inStream);
-
-            if ((Length - 25 == SizeRequested) && (PDU[21] == (byte) 0xFF) && Length >= 25) {
-                System.arraycopy(PDU, 25, Data, Offset, SizeRequested);
-                Offset += SizeRequested;
-            } else {
-                throw new ISOException("errS7CounterRead");
-            }
-            TotElements -= NumElements;
-            Start += NumElements * WordSize;
+    /**
+     * Convert a byte Array into String that contain Hex Characters.
+     * @param bytes byte Array that must be convert
+     * @param start startpoint of reading the buffer
+     * @param len the length to read of buffer (for complete reading use buffer.length)
+     * @return Hexadezimal String from byteArray
+     */
+    public static String bytesToHex(byte[] bytes, int start, int len){
+        char[] hexChars = new char[(len-start) * 2];
+        byte[] bytesToRead = new byte[len-start];
+        System.arraycopy(bytes, start, bytesToRead, 0, len-start);
+        
+        for( int j = 0; j < bytesToRead.length;j++){
+            int v = bytesToRead[j] & 0xFF;
+            hexChars[j * 2] = hexArray[v >>> 4];
+            hexChars[j * 2 +1] = hexArray[v & 0x0F];
         }
-        return 11111;
-    }
-
-    public static void HexDump(byte[] Buffer, int Size) {
-        int r = 0;
-        String Hex = "";
-
-        for (int i = 0; i < Size; i++) {
-            int v = (Buffer[i] & 0x0FF);
-            String hv = Integer.toHexString(v);
-
-            if (hv.length() == 1) {
-                hv = "0" + hv + " ";
-            } else {
-                hv = hv + " ";
-            }
-
-            Hex = Hex + hv;
-
-            r++;
-            if (r == 16) {
-                System.out.print(Hex + " ");
-                System.out.println(S7.GetPrintableStringAt(Buffer, i - 15, 16));
-                Hex = "";
-                r = 0;
-            }
-        }
-        int L = Hex.length();
-        if (L > 0) {
-            while (Hex.length() < 49) {
-                Hex = Hex + " ";
-            }
-            System.out.print(Hex);
-            System.out.println(S7.GetPrintableStringAt(Buffer, Size - r, r));
-        } else {
-            System.out.println();
-        }
+        return new String(hexChars);
     }
     
-        /**
+    /**
      * Disconnect a active TCP-Connection and close the TCP-Socket
      */
     public void disconnect() {

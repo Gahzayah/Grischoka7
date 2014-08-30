@@ -10,27 +10,29 @@ import grischa.dev.moka7.exceptions.TCPException;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
  * @author MaHi
  */
-public class S7Telegram extends S7 {
+public class S7Telegram {
 
-    private byte[] PDU = new byte[2048];
-    private int LastPDUType = 0;
+    // Logging Exceptions and Errors
+
+    public static final Logger logger = Logger.getLogger(S7Client.class.getName());
+    // Main Data Unit
+    public final byte[] PDU = new byte[2048];
+    private final S7 S7 = new S7();
+    // Dynamic Fields
+    private int lastPDUType = 0;
     private int pduLength = 0;
-    private static final int MinPduSize = 16;
-    private static final int DefaultPduSizeRequested = 480;
-    private static final int IsoHSize = 7; // TPKT+COTP Header Size
-    private static final int MaxPduSize = DefaultPduSizeRequested + IsoHSize;
-
-    public static final int LENGTH_READ = 31;
-    public static final int SIZE_WRITE = 35;
-
-    public S7Telegram() {
-
-    }
+    // Static Fields
+    private static final int DEFAULT_PDU_SIZE_REQUESTED = 480;
+    private static final int ISOHEADER_SIZE = 7;                                //IsoHeaderSize (TPKT+COTP)
+    private static final int MIN_PDU_SIZE = 16;
+    private static final int MAX_PDU_SIZE = DEFAULT_PDU_SIZE_REQUESTED + ISOHEADER_SIZE;
 
     /**
      * Send a specify byte array into the outstream and further to the Server.
@@ -38,57 +40,57 @@ public class S7Telegram extends S7 {
      * @param Buffer - specfiy the Buffer that will be send
      * @param Len - specify the length of the Buffer
      * @param outStream - specify a valid DataOutputStream for the Request.
-     * @throws ISOException
+     * @throws grischa.dev.moka7.exceptions.TCPException
      */
-    public void sendRequest(byte[] Buffer, int Len, DataOutputStream outStream) throws TCPException {
+    public void sendRequest(byte[] Buffer, int len, DataOutputStream outStream) throws TCPException {
         try {
-            outStream.write(Buffer, 0, Len);
+            outStream.write(Buffer, 0, len);
             outStream.flush();
         } catch (IOException ex) {
             throw new TCPException("TCP Sending error.", ex);
         }
     }
 
+    public void sendRequest(byte[] Buffer, DataOutputStream outStream) throws TCPException {
+        sendRequest(Buffer, Buffer.length, outStream);
+    }
+
     /**
-     * This method check the Datainputstream for valid Data Unit and returns
-     * correct Size of the PDU. That will be used by the most of Client and
-     * Server methods.
+     * This method check the Datainputstream for valid Data Unit and returns correct Size of the PDU. That
+     * will be used by the most of Client and Server methods.
      *
-     * @param inStream - The InputStream which communictate/receive Date from
-     * the TCP Socket
+     * @param inStream - The InputStream which communictate/receive Date from the TCP Socket
      * @return Size of the PDU (Data Unit)
      * @throws IOException
-     * @throws InterruptedException
      */
-    public int RecvIsoPacket(DataInputStream inStream) throws IOException,InterruptedException {
+    public int RecvIsoPacket(DataInputStream inStream) throws IOException {
         Boolean Done = false;
         int Size = 0;
-        
+
         while (!Done) {
             /* EverLoop möglich */
-            receivePaket(inStream, PDU, 0, 4);               // Get TPKT Header (4 bytes) 
+            receivePaket(inStream, PDU, 0, 4);                          // Get TPKT Header (4 bytes) 
             Size = S7.GetWordAt(PDU, 2);
-            if (Size == IsoHSize) {                          // Check 0 bytes Data Packet (only TPKT+COTP = 7 bytes)
-                receivePaket(inStream, PDU, 4, 3);           // Skip remaining 3 bytes and Done is still false
+            if (Size == ISOHEADER_SIZE) {                               // Check 0 bytes Data Packet (only TPKT+COTP = 7 bytes)
+                receivePaket(inStream, PDU, 4, 3);                      // Skip remaining 3 bytes and Done is still false
             } else {
-                if ((Size > MaxPduSize) || (Size < MinPduSize)) {
+                if ((Size > MAX_PDU_SIZE) || (Size < MIN_PDU_SIZE)) {   // a valid length !=7 && >16 && <247
                     throw new ISOException("InvalidPDU");
                 } else {
-                    Done = true;                             // a valid length !=7 && >16 && <247
+                    Done = true;
                 }
             }
         }
-        receivePaket(inStream, PDU, 4, 3);                   // Skip remaining 3 COTP bytes
-        setLastPDUType(PDU[5]);                              // Stores PDU Type, we need it        
-        receivePaket(inStream, PDU, 7, Size - IsoHSize);     // Receives the S7 Payload 
-        
+        receivePaket(inStream, PDU, 4, 3);                              // Skip remaining 3 COTP bytes
+        lastPDUType = PDU[5];                                           // Stores PDU Type, we need it        
+        receivePaket(inStream, PDU, 7, Size - ISOHEADER_SIZE);          // Receives the S7 Payload 
+
         return Size;
     }
 
     /**
      *
-     * Reads up to Size bytes of data from the contained input stream into an
-     * array of bytes.
+     * Reads up to Size bytes of data from the contained input stream into an array of bytes.
      *
      * @param inStream - read the primitive Java data types
      * @param pdu - Data Unit that contained an array of bytes
@@ -98,75 +100,79 @@ public class S7Telegram extends S7 {
      * @throws InterruptedException
      */
     @SuppressWarnings("SleepWhileInLoop")
-    private void receivePaket(DataInputStream inStream, byte[] pdu, int start, int len) throws IOException, InterruptedException {
+    private void receivePaket(DataInputStream inStream, byte[] pdu, int start, int len) throws IOException {
         int Timeout = 2000;
         int cnt = 0;
         int SizeAvail = 0;
         int bytesRead = 0;
 
         /* Wait for Data */
+        SizeAvail = inStream.available();
         while ((SizeAvail < len) && (cnt < Timeout)) {
             cnt++;
-            Thread.sleep(1);
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException ex) {
+                logger.log(Level.WARNING, "Interrupped Exception", ex);
+            }
             SizeAvail = inStream.available();
             // If timeout we clean the buffer
             if (cnt > Timeout && SizeAvail > 0) {
-                inStream.read(pdu, start, SizeAvail);
+                inStream.read(PDU, start, SizeAvail);
                 throw new TCPException("Data Receiving timeout." + inStream.toString());
             }
         }
-            
+
         bytesRead = inStream.read(pdu, start, len);
         if (bytesRead == 0) {
             throw new TCPException("Connection reset by the peer.");
         }
     }
 
-    public int NegotiatePduLength(DataOutputStream outStream, DataInputStream inStream) throws ISOException, IOException, InterruptedException {
+    public int NegotiatePduLength(DataOutputStream outStream, DataInputStream inStream) throws IOException {
         int length = 0;
         // Set PDU Size Requested
-        S7.SetWordAt(S7_PN, 23, DefaultPduSizeRequested);
+        S7.SetWordAt(S7_PN, 23, DEFAULT_PDU_SIZE_REQUESTED);
         // Sends the connection request telegram
         sendRequest(S7_PN, S7_PN.length, outStream);
         length = RecvIsoPacket(inStream);
         setPduLength(S7.GetWordAt(PDU, 25));
         // check S7 Error
         if ((length != 27) && (PDU[17] != 0) && (PDU[18] != 0) && getPduLength() <= 0) // 20 = size of Negotiate Answer
+        {
             throw new ISOException("ISO error negotiating the PDU length.");
+        }
 
-        
         return pduLength;
     }
 
     /**
-     * This Parameter are important and must set before you connect first time
-     * to the PLC. Remember that rack and slot can depend from you
-     * hardware-configuration. So Read the manuals.
+     * This Parameter are important and must set before you connect first time to the PLC. Remember that rack
+     * and slot can depend from you hardware-configuration. So Read the manuals.
      *
-     * @param connectionType - specify the kind of Connection to the PLC see
-     * below 
-     * o 0x01 -> PG (the programming console) 
-     * o 0x02 -> OP (the Siemens HMI panel) 
-     * o 0x03 -> Basic (a generic data transfer connection).
+     * @param connectionType - specify the kind of Connection to the PLC see below o 0x01 -> PG (the
+     * programming console) o 0x02 -> OP (the Siemens HMI panel) o 0x03 -> Basic (a generic data transfer
+     * connection).
      * @param rack - specify the rack for the plc (std = 0)
-     * @param slot - specify the slot number for the plc (std = 2 ) 
+     * @param slot - specify the slot number for the plc (std = 2 )
      */
-    public void setConnectionParams(byte connectionType, int rack, int slot) {
+    public void setConnectionParams(short connectionType, int rack, int slot) {
         int LocTSAP = 0x0100 & 0x0000FFFF;
         int RemTSAP = (connectionType << 8) + (rack * 0x20) + slot & 0x0000FFFF;
 
         ISO_CR[16] = (byte) (LocTSAP >> 8);          //Src TSAP HI (LocalTSAP_HI  will be overwritten)
         ISO_CR[17] = (byte) (LocTSAP & 0x00FF);      //Src TSAP LO (LocalTSAP_LO  will be overwritten)
         ISO_CR[20] = (byte) (RemTSAP >> 8);          //Dst TSAP HI (RemoteTSAP_HI will be overwritten)
-        ISO_CR[21] = (byte) (RemTSAP & 0x00FF);      //Dst TSAP LO (RemoteTSAP_LO will be overwritten)
+        ISO_CR[21] = (byte) (RemTSAP & 0x00FF);      //Dst TSAP LO (RemoteTSAP_LO will be overwritten)  
+
     }
 
     public int getLastPDUType() {
-        return LastPDUType;
+        return lastPDUType;
     }
 
-    public void setLastPDUType(int LastPDUType) {
-        this.LastPDUType = LastPDUType;
+    public void setLastPDUType(int lastPDUType) {
+        this.lastPDUType = lastPDUType;
     }
 
     public int getPduLength() {

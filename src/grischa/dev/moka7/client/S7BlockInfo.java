@@ -21,6 +21,8 @@ public class S7BlockInfo {
     {
         System.arraycopy(Src, Pos, Buffer, 0, BufSize);
     }   
+    
+    
     public int BlkType()
     {
        return Buffer[2];
