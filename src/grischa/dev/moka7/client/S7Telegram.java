@@ -66,7 +66,7 @@ public class S7Telegram extends S7 {
         
         while (!Done) {
             /* EverLoop möglich */
-            receivePaket(inStream, PDU, 0, 4);               // Get TPKT (4 bytes) 
+            receivePaket(inStream, PDU, 0, 4);               // Get TPKT Header (4 bytes) 
             Size = S7.GetWordAt(PDU, 2);
             if (Size == IsoHSize) {                          // Check 0 bytes Data Packet (only TPKT+COTP = 7 bytes)
                 receivePaket(inStream, PDU, 4, 3);           // Skip remaining 3 bytes and Done is still false
@@ -122,15 +122,6 @@ public class S7Telegram extends S7 {
         }
     }
 
-    /**
-     *
-     * @param outStream
-     * @param inStream
-     * @return
-     * @throws ISOException
-     * @throws IOException
-     * @throws InterruptedException
-     */
     public int NegotiatePduLength(DataOutputStream outStream, DataInputStream inStream) throws ISOException, IOException, InterruptedException {
         int length = 0;
         // Set PDU Size Requested
@@ -141,9 +132,8 @@ public class S7Telegram extends S7 {
         setPduLength(S7.GetWordAt(PDU, 25));
         // check S7 Error
         if ((length != 27) && (PDU[17] != 0) && (PDU[18] != 0) && getPduLength() <= 0) // 20 = size of Negotiate Answer
-        {
             throw new ISOException("ISO error negotiating the PDU length.");
-        }
+
         
         return pduLength;
     }
@@ -221,7 +211,7 @@ public class S7Telegram extends S7 {
         (byte) 0x04, (byte) 0x00, (byte) 0x00,};
 
     // S7 Get Block Info Request Header (contains also ISO Header and COTP Header)
-    public static final byte S7_BI[] = {
+    public byte S7_BI[] = {
         (byte) 0x03, (byte) 0x00, (byte) 0x00, (byte) 0x25,
         (byte) 0x02, (byte) 0xf0, (byte) 0x80, (byte) 0x32,
         (byte) 0x07, (byte) 0x00, (byte) 0x00, (byte) 0x05,

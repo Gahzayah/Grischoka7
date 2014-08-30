@@ -77,10 +77,10 @@ public class S7Client extends S7Telegram {
                 outStream = new DataOutputStream(socket.getOutputStream());
 
                 setConnectionParams(connectionType, rack, slot);
+                
                 // Second: ISO-Connection
-
                 sendRequest(ISO_CR, ISO_CR.length, outStream);           // Send the ConnectionRequest-Package
-                size = RecvIsoPacket(inStream);   // Gets the reply (if any)
+                size = RecvIsoPacket(inStream);                          // Gets the reply (if any)
                 if (size == 22) {
                     if (getLastPDUType() != (byte) 0xD0) {
                         throw new ISOException("ISO connection refused by the CPU.");
@@ -105,21 +105,6 @@ public class S7Client extends S7Telegram {
 
         }
 
-    }
-
-    /**
-     * Disconnect a active TCP-Connection and close the TCP-Socket
-     */
-    public void disconnect() {
-        if (connected) {
-            try {
-                outStream.close();
-                inStream.close();
-                socket.close();
-            } catch (IOException ex) {
-            }
-            connected = false;
-        }
     }
 
 //    public int DBGet(int DBNumber, byte[] Buffer, IntByRef SizeRead) throws IOException, ISOException, InterruptedException
@@ -187,6 +172,7 @@ public class S7Client extends S7Telegram {
     @SuppressWarnings("UnnecessaryReturnStatement")
     public void GetAgBlockInfo(int BlockType, int BlockNumber) {
         S7BlockInfo blockinfo = new S7BlockInfo();
+
         // Block Type
         S7_BI[30] = (byte) BlockType;
         // Block Number
@@ -303,6 +289,21 @@ public class S7Client extends S7Telegram {
             System.out.println(S7.GetPrintableStringAt(Buffer, Size - r, r));
         } else {
             System.out.println();
+        }
+    }
+    
+        /**
+     * Disconnect a active TCP-Connection and close the TCP-Socket
+     */
+    public void disconnect() {
+        if (connected) {
+            try {
+                outStream.close();
+                inStream.close();
+                socket.close();
+            } catch (IOException ex) {
+            }
+            connected = false;
         }
     }
 
