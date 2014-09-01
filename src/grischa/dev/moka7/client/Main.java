@@ -12,17 +12,16 @@ package grischa.dev.moka7.client;
 public class Main extends Thread {
 
     public static void main(String[] args) throws InterruptedException {
-
-        Polling t1 = new Polling(100);
-        Polling1 t2 = new Polling1(10);
+        ResponseClass resp = new ResponseClass();
+        Polling t1 = new Polling(100,resp);
         t1.init();     
         t1.start();
-        t2.start();
+
         // Synchronized Requesting .. Blocking here
         long start = System.currentTimeMillis();
         t1.join(18000);
         long end = System.currentTimeMillis();
-        System.out.println(" <> Zeit = " + (end - start) + "ms");
+        System.out.println("ExcuTime = " + (end - start) + "ms");
         
         
 

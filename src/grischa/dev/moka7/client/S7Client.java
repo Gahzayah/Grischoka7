@@ -128,10 +128,10 @@ public class S7Client extends S7Telegram {
         int start = 0;
         int lenToRead = 31;
         int offset = 0;
-        int SizeRequested = 0;
-        int NumElements = 0;
-        int MaxElements = 0;
-        int TotElements = 0;
+        int SizeRequested;
+        int NumElements;
+        int MaxElements;
+        int TotElements;
         
         S7BlockInfo block = GetAgBlockInfo(S7.Block_DB, DBNumber);
 
@@ -195,8 +195,8 @@ public class S7Client extends S7Telegram {
         S7_BI[34] = (byte) ((BlockNumber / 10) + 0x30);
         BlockNumber = BlockNumber % 10;
         S7_BI[35] = (byte) ((BlockNumber / 1) + 0x30);
+        
         try {
-
             sendRequest(S7_BI, outStream);
             Length = RecvIsoPacket(inStream);
             if (Length > 32) // the minimum expected

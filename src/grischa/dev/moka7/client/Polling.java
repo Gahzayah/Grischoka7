@@ -5,9 +5,6 @@
  */
 package grischa.dev.moka7.client;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 /**
  *
  * @author MaHi
@@ -17,9 +14,12 @@ public class Polling extends Thread {
     private static byte[] Buffer = new byte[65536]; // 64K buffer (maximum for S7400 systems)
     private int NUMBER_OF_REQUEST = 0;
     S7Client client = null;
+    ResponseClass resp = null;
 
-    public Polling(int nbr) {
+    public Polling(int nbr,ResponseClass resp) {
         this.NUMBER_OF_REQUEST = nbr;
+        this.resp=resp;
+        resp.setPolling(this);
     }
 
     public void init() {
@@ -34,12 +34,15 @@ public class Polling extends Thread {
         boolean poll = true;
         // Do Something
         System.out.println("Polling started...");
-        while (poll) {
-             cnt++;
+//        while (poll) {
+//          cnt++;
             for (int i = 0; i < NUMBER_OF_REQUEST; i++) {
                
                 Buffer = client.ReadArea(S7.S7AreaDB, 100);
                // System.out.print("|" + cnt);
+                if(i==25){
+                    resp.setNumberOfRequest();
+                }
 
 //            System.out.println(client.bytesToHex(Buffer, 0, 12));
                 
@@ -54,10 +57,22 @@ public class Polling extends Thread {
 //            System.out.print("Value 4 (4 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 6, 10), 16));
 //            System.out.print("Value 5 (4 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 10, 12), 16));
             }
-            System.out.println("" + Integer.parseInt(client.bytesToHex(Buffer, 0, 2), 16));
-            if (cnt > 10) {
-                poll = false;
-            }
-        }
+            resp.printResult("Result   = "+Integer.parseInt(client.bytesToHex(Buffer, 0, 2), 16));
+            resp.printResult("NbrOfReq = "+NUMBER_OF_REQUEST);
+
+//            if (cnt > 10) {
+//                poll = false;
+//            }
+//        }
     }
+
+    public int getNUMBER_OF_REQUEST() {
+        return NUMBER_OF_REQUEST;
+    }
+
+    public void setNUMBER_OF_REQUEST(int NUMBER_OF_REQUEST) {
+        this.NUMBER_OF_REQUEST = NUMBER_OF_REQUEST;
+    }
+    
+    
 }
