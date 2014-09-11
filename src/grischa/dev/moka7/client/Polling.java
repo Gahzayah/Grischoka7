@@ -38,7 +38,7 @@ public class Polling extends Thread {
              cnt++;
             for (int i = 0; i < NUMBER_OF_REQUEST; i++) {
                
-                Buffer = client.ReadArea(S7.S7AreaDB, 100);
+                Buffer = client.ReadArea(S7Utility.S7AreaDB, 100);
                // System.out.print("|" + cnt);
 
 //            System.out.println(client.bytesToHex(Buffer, 0, 12));

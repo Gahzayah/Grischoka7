@@ -17,8 +17,8 @@ import java.util.Calendar;
 
 
 // Step 7 Constants and Conversion helper class
-public class S7 {
-    // S7 ID Area (Area that we want to read/write)
+public class S7Utility {
+    // S7Utility ID Area (Area that we want to read/write)
     public static final int S7AreaPE = 0x81;
     public static final int S7AreaPA = 0x82;
     public static final int S7AreaMK = 0x83;
@@ -166,17 +166,17 @@ public class S7 {
         int Year, Month, Day, Hour, Min, Sec;
         Calendar S7Date = Calendar.getInstance();
 
-        Year = S7.BCDtoByte(Buffer[Pos]);
+        Year = S7Utility.BCDtoByte(Buffer[Pos]);
         if (Year<90)
             Year+=2000;
         else
             Year+=1900;
 
-        Month=S7.BCDtoByte(Buffer[Pos+1])-1;
-        Day  =S7.BCDtoByte(Buffer[Pos+2]);
-        Hour =S7.BCDtoByte(Buffer[Pos+3]);
-        Min  =S7.BCDtoByte(Buffer[Pos+4]);
-        Sec  =S7.BCDtoByte(Buffer[Pos+5]);
+        Month=S7Utility.BCDtoByte(Buffer[Pos+1])-1;
+        Day  =S7Utility.BCDtoByte(Buffer[Pos+2]);
+        Hour =S7Utility.BCDtoByte(Buffer[Pos+3]);
+        Min  =S7Utility.BCDtoByte(Buffer[Pos+4]);
+        Sec  =S7Utility.BCDtoByte(Buffer[Pos+5]);
 
         S7Date.set(Year, Month, Day, Hour, Min, Sec);                   
         

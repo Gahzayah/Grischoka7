@@ -17,14 +17,13 @@ import java.util.logging.Logger;
  *
  * @author MaHi
  */
-public class S7Telegram {
+public class S7Packet {
 
     // Logging Exceptions and Errors
-
     public static final Logger logger = Logger.getLogger(S7Client.class.getName());
     // Main Data Unit
     public final byte[] PDU = new byte[2048];
-    private final S7 S7 = new S7();
+    private final S7Utility S7 = new S7Utility();
     // Dynamic Fields
     private int lastPDUType = 0;
     private int pduLength = 0;
@@ -38,7 +37,7 @@ public class S7Telegram {
      * Send a specify byte array into the outstream and further to the Server.
      *
      * @param Buffer - specfiy the Buffer that will be send
-     * @param Len - specify the length of the Buffer
+     * @param len - specify the length of the Buffer
      * @param outStream - specify a valid DataOutputStream for the Request.
      * @throws grischa.dev.moka7.exceptions.TCPException
      */
@@ -74,7 +73,7 @@ public class S7Telegram {
             if (Size == ISOHEADER_SIZE) {                               // Check 0 bytes Data Packet (only TPKT+COTP = 7 bytes)
                 receivePaket(inStream, PDU, 4, 3);                      // Skip remaining 3 bytes and Done is still false
             } else {
-                if ((Size > MAX_PDU_SIZE) || (Size < MIN_PDU_SIZE)) {   // a valid length !=7 && >16 && <247
+                if ((Size > MAX_PDU_SIZE) || (Size < MIN_PDU_SIZE)) {   // a valid length !=7 && > 16 && < 247
                     throw new ISOException("InvalidPDU");
                 } else {
                     Done = true;
@@ -83,7 +82,7 @@ public class S7Telegram {
         }
         receivePaket(inStream, PDU, 4, 3);                              // Skip remaining 3 COTP bytes
         lastPDUType = PDU[5];                                           // Stores PDU Type, we need it        
-        receivePaket(inStream, PDU, 7, Size - ISOHEADER_SIZE);          // Receives the S7 Payload 
+        receivePaket(inStream, PDU, 7, Size - ISOHEADER_SIZE);          // Receives the S7Utility Payload 
 
         return Size;
     }
@@ -128,7 +127,13 @@ public class S7Telegram {
             throw new TCPException("Connection reset by the peer.");
         }
     }
-
+    /**
+     * 
+     * @param outStream
+     * @param inStream
+     * @return PDU Length
+     * @throws IOException 
+     */
     public int NegotiatePduLength(DataOutputStream outStream, DataInputStream inStream) throws IOException {
         int length = 0;
         // Set PDU Size Requested
@@ -137,7 +142,7 @@ public class S7Telegram {
         sendRequest(S7_PN, S7_PN.length, outStream);
         length = RecvIsoPacket(inStream);
         setPduLength(S7.GetWordAt(PDU, 25));
-        // check S7 Error
+        // check S7Utility Error
         if ((length != 27) && (PDU[17] != 0) && (PDU[18] != 0) && getPduLength() <= 0) // 20 = size of Negotiate Answer
         {
             throw new ISOException("ISO error negotiating the PDU length.");
@@ -193,7 +198,7 @@ public class S7Telegram {
         (byte) 0x01, (byte) 0x02
     };
 
-    // S7 PDU Negotiation Telegram (contains also ISO Header and COTP Header)
+    // S7Utility PDU Negotiation Telegram (contains also ISO Header and COTP Header)
     public static final byte S7_PN[] = {
         (byte) 0x03, (byte) 0x00, (byte) 0x00, (byte) 0x19,
         (byte) 0x02, (byte) 0xf0, (byte) 0x80, (byte) 0x32,
@@ -204,7 +209,7 @@ public class S7Telegram {
         (byte) 0x1e
     };
 
-    // S7 Read/Write Request Header (contains also ISO Header and COTP Header)
+    // S7Utility Read/Write Request Header (contains also ISO Header and COTP Header)
     public static final byte S7_RW[] = { // 31-35 bytes
         (byte) 0x03, (byte) 0x00, (byte) 0x00, (byte) 0x1f,
         (byte) 0x02, (byte) 0xf0, (byte) 0x80, (byte) 0x32,
@@ -216,7 +221,7 @@ public class S7Telegram {
         (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
         (byte) 0x04, (byte) 0x00, (byte) 0x00,};
 
-    // S7 Get Block Info Request Header (contains also ISO Header and COTP Header)
+    // S7Utility Get Block Info Request Header (contains also ISO Header and COTP Header)
     public byte S7_BI[] = {
         (byte) 0x03, (byte) 0x00, (byte) 0x00, (byte) 0x25,
         (byte) 0x02, (byte) 0xf0, (byte) 0x80, (byte) 0x32,
@@ -282,7 +287,7 @@ public class S7Telegram {
         (byte) 0x13, (byte) 0x00, (byte) 0x01
     };
 
-    // S7 STOP request
+    // S7Utility STOP request
     public static final byte S7_STOP[] = {
         (byte) 0x03, (byte) 0x00, (byte) 0x00, (byte) 0x21,
         (byte) 0x02, (byte) 0xf0, (byte) 0x80, (byte) 0x32,
@@ -295,7 +300,7 @@ public class S7Telegram {
         (byte) 0x4d
     };
 
-    // S7 HOT Start request
+    // S7Utility HOT Start request
     public static final byte S7_HOT_START[] = {
         (byte) 0x03, (byte) 0x00, (byte) 0x00, (byte) 0x25,
         (byte) 0x02, (byte) 0xf0, (byte) 0x80, (byte) 0x32,
@@ -309,7 +314,7 @@ public class S7Telegram {
         (byte) 0x4d
     };
 
-    // S7 COLD Start request
+    // S7Utility COLD Start request
     public static final byte S7_COLD_START[] = {
         (byte) 0x03, (byte) 0x00, (byte) 0x00, (byte) 0x27,
         (byte) 0x02, (byte) 0xf0, (byte) 0x80, (byte) 0x32,
@@ -323,7 +328,7 @@ public class S7Telegram {
         (byte) 0x52, (byte) 0x41, (byte) 0x4d
     };
 
-    // S7 Get PLC Status 
+    // S7Utility Get PLC Status 
     public static final byte S7_GET_STAT[] = {
         (byte) 0x03, (byte) 0x00, (byte) 0x00, (byte) 0x21,
         (byte) 0x02, (byte) 0xf0, (byte) 0x80, (byte) 0x32,
@@ -336,7 +341,7 @@ public class S7Telegram {
         (byte) 0x00
     };
 
-    // S7 Set Session Password 
+    // S7Utility Set Session Password 
     public static final byte S7_SET_PWD[] = {
         (byte) 0x03, (byte) 0x00, (byte) 0x00, (byte) 0x25,
         (byte) 0x02, (byte) 0xf0, (byte) 0x80, (byte) 0x32,
@@ -350,7 +355,7 @@ public class S7Telegram {
         (byte) 0x00
     };
 
-    // S7 Clear Session Password 
+    // S7Utility Clear Session Password 
     public static final byte S7_CLR_PWD[] = {
         (byte) 0x03, (byte) 0x00, (byte) 0x00, (byte) 0x1d,
         (byte) 0x02, (byte) 0xf0, (byte) 0x80, (byte) 0x32,
