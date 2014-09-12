@@ -1,0 +1,8 @@
+CREATE TABLE WriteTask (
+WriteTaskID INTEGER PRIMARY KEY,
+ProcessVar INTEGER Not Null,
+Value INTEGER Not Null,
+Timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+FOREIGN KEY (ProcessVar) REFERENCES ProcessVars(ProcVarsID)
+
+);
