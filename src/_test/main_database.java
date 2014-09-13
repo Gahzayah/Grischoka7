@@ -6,7 +6,6 @@
 package _test;
 
 import grischa.dev.db.table.TableController;
-import grischa.dev.db.table.TableModel;
 import grischa.dev.db.utility.DBUtil;
 import java.sql.Connection;
 import java.sql.SQLException;
