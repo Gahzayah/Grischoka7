@@ -1,15 +1,20 @@
+package _test;
+
+import grischa.dev.moka7.client.Polling;
+import grischa.dev.moka7.client.Polling1;
+
 /*
  * To change this license header, choose License Headers in Project Properties.
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package grischa.dev.moka7.client;
+
 
 /**
  *
  * @author mhi
  */
-public class Main extends Thread {
+public class main_s7client extends Thread {
 
     public static void main(String[] args) throws InterruptedException {
 
