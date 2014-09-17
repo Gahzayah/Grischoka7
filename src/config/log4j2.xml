@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- To load this file from another Source, add this file to the Class path -->
+<Configuration status="WARN">
+   <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%highlight{[%-5level]}{STYLE=Logback} %d{DATE} %c{3} - %highlight{%m%n%throwable}{STYLE=Logback}"/> 
+        </Console>
+    </Appenders>
+    <Loggers>
+        <Root level="debug">
+            <AppenderRef ref="Console"/>
+        </Root>
+    </Loggers>
+</Configuration>
