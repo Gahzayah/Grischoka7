@@ -10,8 +10,8 @@ import grischa.dev.moka7.exceptions.TCPException;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 
 /**
@@ -35,7 +35,7 @@ public class S7Packet {
     private static final int MAX_PDU_SIZE = DEFAULT_PDU_SIZE_REQUESTED + ISOHEADER_SIZE;
 
     public S7Packet() {
-        logger.setLevel(Level.INFO);
+
     }
 
     
@@ -118,7 +118,7 @@ public class S7Packet {
             try {
                 Thread.sleep(1);
             } catch (InterruptedException ex) {
-                logger.log(Level.ERROR, "Interrupped Exception", ex);
+                logger.log(Level.SEVERE, "Interrupped Exception", ex);
             }
             SizeAvail = inStream.available();
             // If timeout we clean the buffer
@@ -411,7 +411,9 @@ public class S7Packet {
        (byte) 0x00, (byte) 0x02,                            // Length - variable
        (byte) 0x00, (byte) 0x65,                            // DB Number - variable
        (byte) 0x84,                                         // Area Data Blocks - variable
-       (byte) 0x00, (byte) 0x00,(byte) 0x00               // Adress
+       (byte) 0x00, (byte) 0x00,(byte) 0x00 ,                // Adress
+       (byte) 0x00, (byte) 0x00,(byte) 0x00 ,(byte) 0x00     
+            
 
     };
 }

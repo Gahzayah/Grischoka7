@@ -12,9 +12,9 @@ import grischa.dev.moka7.data.ProcVars;
 import java.io.IOException;
 import static java.lang.Thread.sleep;
 import java.util.ArrayList;
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 
 /**
  *
@@ -22,7 +22,7 @@ import org.apache.logging.log4j.Logger;
  */
 public class S7Service implements Runnable {
 
-    private static final Logger logger = LogManager.getLogger(S7Service.class.getName());
+    private static final Logger logger = Logger.getLogger(S7Service.class.getName());
 
     private ArrayList<ProcVars> list;
 
@@ -56,7 +56,7 @@ public class S7Service implements Runnable {
                 sleep(POLLING_FREQ);
                 readData();
             } catch (InterruptedException ex) {
-                logger.log(Level.FATAL, "Sleep invoke an Error");
+                logger.log(Level.SEVERE, "Sleep invoke an Error");
                 return;
             }
             if (counter >= 10) {
@@ -83,25 +83,33 @@ public class S7Service implements Runnable {
         @SuppressWarnings("static-access")
     public void readMultivars() throws IOException {
         byte[] Buffer = new byte[65536];
+        ArrayList<S7Item> source = null;
+        ArrayList<S7Item> destin = null;
+        // Read Processvariabeln
+        //handler.readProcVars();
         
-        ArrayList<S7Item> source = new ArrayList();
-
-        source.add(new S7Item(100, 0, 12));
-        source.add(new S7Item(100, 0, 12));
-        source.add(new S7Item(100, 0, 12));
+        // Fill up List for Polling
+        for(int i= 1 ; i <=13 ; i++){
+            destin = new ArrayList();
+            destin.add(new S7Item(100, 0, 12));
+         }
+        // Read Data from PLC
         
-        Buffer = client.readMuliVars(S7Utility.S7AreaDB, source);
+        long start = System.currentTimeMillis();
+        Buffer = client.readMuliVars(S7Utility.S7AreaDB, destin);
+        long end = System.currentTimeMillis();
+        
 
      System.out.println(client.bytesToHex(Buffer, 0, 36));
         System.out.println("Value 1 (2 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 0, 2), 16));
         System.out.println("Value 2 (2 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 2, 4), 16));
-       System.out.println("Value 3 (2 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 4, 6), 16));
+        System.out.println("Value 3 (2 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 4, 6), 16));
         System.out.println("Value 4 (4 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 6, 10), 16));
         System.out.println("Value 5 (4 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 10, 12), 16));
         
 
        System.out.println("Value 3 (2 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 16, 18), 16));
-
+       System.out.println("Execution Time = " + (end-start));
 
                 
     }

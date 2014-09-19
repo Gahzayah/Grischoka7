@@ -18,11 +18,12 @@ public class TableController {
 
     private TableModel model = null;
     private Connection conn = null;
-    private PreparedStatement stmt = null;
+    private PreparedStatement pstm = null;
     private ResultSet rs = null;
+    private String tableName = null;
 
-    public TableController(Connection conn , String tablename) {
-        model = new TableModel(tablename);
+    public TableController(Connection conn) {
+        model = new TableModel(tableName);
         this.conn = conn;
     }
 
@@ -31,12 +32,13 @@ public class TableController {
             conn.setAutoCommit(false); //Aenderungen werden nicht gleich gemacht
 
             //vorbereitet Statement
-            stmt = conn.prepareStatement(
-                    "SELECT * FROM Log",
+            pstm = conn.prepareStatement(
+                    "SELECT * FROM " + tableName,
                     ResultSet.TYPE_FORWARD_ONLY,
                     ResultSet.CONCUR_READ_ONLY);
+            //pstm.setString(1, tableName);
 
-            rs = stmt.executeQuery();
+            rs = pstm.executeQuery();
             model.setResultSet(rs);
             model.initTableModel();
         }
@@ -45,7 +47,7 @@ public class TableController {
     public void disconnect() throws SQLException {
         rs.close();
         conn.rollback();
-        stmt.close();
+        pstm.close();
         conn.close();
     }
 
@@ -81,5 +83,9 @@ public class TableController {
             }
         });
 
+    }
+
+    public void setTableName(String tableName) {
+        this.tableName = tableName;
     }
 }

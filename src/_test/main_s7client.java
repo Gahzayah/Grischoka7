@@ -13,31 +13,31 @@ import java.io.IOException;
 public class main_s7client extends Thread {
 
     public static void main(String[] args) throws InterruptedException, IOException {
-        // Connect to PLC
+        /*** Connect to PLC ***/
         S7Client client = new S7Client();
         client.setConnectionParams(S7Utility.PG, 0, 2);
         client.connectTo("192.168.16.222", 0, 2);
 
-        // Start Functionstest
+        /*** START FUNCTIONSTEST ***/
         //client.serviceAbilityTest();
 
-        // Connect to Database
+        /*** CONNECT TO DATABASE ***/
         S7Handler handler = new S7Handler();
-  //      handler.connectToDB();
-  //      handler.showTableModel("Log");
+        handler.connectToDB();
+        handler.showTableModel("ProcessVars");
 
-        // Read ProcVars for Worker
+        /*** READ PROCVARS FOR WORKER ***/
         //handler.readProcVars();
 
-        // Read Task ( Write Task )
+        /*** Read Task ( Write Task ) ***/
         //handler.readProcVarsTask();
 
-        // Initialize Polling Service
+        /*** Initialize Polling Service ***/
         S7Service service = new S7Service( handler , client );
-        service.readData();
+       // service.readData();
         service.readMultivars();
  //       service.pollPLC();
-        // Start Polling
+        /*** Start Polling **/
 
             // readProcVars()
         // readArea()

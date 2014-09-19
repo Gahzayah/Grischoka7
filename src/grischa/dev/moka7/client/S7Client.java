@@ -14,12 +14,10 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import java.util.Formatter;
+import java.util.Locale;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  *
@@ -43,9 +41,10 @@ public class S7Client extends S7Packet {
     private static final char[] hexArray = "0123456789ABCDEF".toCharArray();
 
     /* Apache Logger */
-    private static final Logger logger = LogManager.getLogger(S7Client.class.getName());
+    private static final Logger logger = Logger.getLogger(S7Client.class.getName());
 
     public S7Client() {
+
     }
 
     public S7Client(byte connectionType, int rack, int slot) {
@@ -95,10 +94,10 @@ public class S7Client extends S7Packet {
                 // Third: NegotiatePduLength
                 size = NegotiatePduLength(outStream, inStream);
             } catch (ISOException ex) {
-                logger.log(Level.ERROR, "ISO Communication Error.", ex);
+                logger.log(Level.SEVERE, "ISO Communication Error.", ex);
                 return;
             } catch (IOException ex) {
-                logger.log(Level.ERROR, "TCP Connection Failed.", ex);
+                logger.log(Level.SEVERE, "TCP Connection Failed.", ex);
                 return;
             }
             logger.log(Level.INFO, "Negotiate PDU Length: " + size);
@@ -187,7 +186,7 @@ public class S7Client extends S7Packet {
                     throw new ISOException("Receive invalid PDU in ReadArea");
                 }
             } catch (IOException ex) {
-                logger.log(Level.ERROR, "ISO Communication Error.", ex);
+                logger.log(Level.SEVERE, "ISO Communication Error.", ex);
             }
 
             TotElements -= NumElements;
@@ -195,8 +194,62 @@ public class S7Client extends S7Packet {
         }
         return buffer;
     }
-
+    /**
+     * Read up to 240 bytes (20 Adresses) in one Telegram. 
+     * This Function is more efficent than ReadArea by read many Adresses in a row.
+     * @param Area
+     * @param list
+     * @return
+     * @throws IOException 
+     */
     public byte[] readMuliVars(int Area, ArrayList<S7Item> list) throws IOException {
+        buffer = new byte[65536];
+        int length = 0;
+        int frameSize = 19;
+        int itemSize = 12;
+        int itemsSize = itemSize * list.size();
+        int lenToRead = frameSize + itemsSize;
+
+        
+        if(itemsSize >= 240){
+           throw new ISOException("PDU has reached the maximus Size");
+        }
+        // Start to setup Telegram
+        RW_MVARS[18] = (byte) list.size();                                  // Set Number of elements
+        System.arraycopy(RW_MVARS, 0, PDU, 0, RW_MVARS.length);
+
+
+        // Add Items to Telegramm
+        for (int i = 0; i < list.size(); i++) {
+            S7Utility.SetWordAt(ITEM, 4, list.get(i).getLength());          // Length
+            S7Utility.SetWordAt(ITEM, 6, list.get(i).getDBNumber());        // DB-Number
+            if(Area == S7Utility.S7AreaDB || Area == S7Utility.S7AreaDB){
+                ITEM[8] = (byte) Area;                                      // Area-Type
+            }else{
+                throw new ISOException("Invalid Type of Area");
+            }
+            System.arraycopy(ITEM, 0, PDU, frameSize + itemSize * i, ITEM.length);
+        }
+        // Set up Parameter
+        S7Utility.SetWordAt(PDU, 2, lenToRead);                             // TPTK Länge
+        S7Utility.SetWordAt(PDU, 13, itemSize * list.size() + 2);           // Parameter Länge
+
+        try {
+            sendRequest(PDU, lenToRead, outStream);
+            length = RecvIsoPacket(inStream);
+        } catch (ISOException ex) {
+            logger.log(Level.SEVERE,"ISO Communication Error.",ex);
+        }
+
+        if (PDU[21] == (byte) 0xFF && length >= 25) {
+            System.arraycopy(PDU, 25, buffer, 0, lenToRead);
+        } else {
+            throw new ISOException("Receive invalid PDU in ReadMultivars");
+        }
+        return buffer;
+    }
+    
+    public byte[] writeMuliVars(int Area, ArrayList<S7Item> list) throws IOException {
         byte[] buffer = new byte[65536];
         int length = 0;
         int address = 0;
@@ -204,9 +257,12 @@ public class S7Client extends S7Packet {
         int itemSize = 12;
         int itemsSize = itemSize * list.size();
         int lenToRead = frameSize + itemsSize;
-
+        int sizeRequested = 0;
+        
         // Start to setup Telegram
+        RW_MVARS[18] = (byte) list.size();                                  // Set Number of elements
         System.arraycopy(RW_MVARS, 0, PDU, 0, RW_MVARS.length);
+
 
         // Add Items to Telegramm
         for (int i = 0; i < list.size(); i++) {
@@ -216,24 +272,16 @@ public class S7Client extends S7Packet {
             System.arraycopy(ITEM, 0, PDU, frameSize + itemSize * i, ITEM.length);
         }
         // Set up Parameter
-        S7Utility.SetWordAt(PDU, 2, lenToRead);                           // TPTK Länge
-        S7Utility.SetWordAt(PDU, 13, itemSize * list.size() + 2);         // Parameter Länge
-        S7Utility.SetWordAt(PDU, 23, itemSize);                                   // Set Number of elements   
-
-
-        // Address into the PLC (only 3 bytes)           
-        PDU[30] = (byte) (address & 0x0FF);                                 // Adjusts Start and word length
-        address = address >> 8;
-        PDU[29] = (byte) (address & 0x0FF);
-        address = address >> 8;
-        PDU[28] = (byte) (address & 0x0FF);
+        S7Utility.SetWordAt(PDU, 2, lenToRead);                             // TPTK Länge
+        S7Utility.SetWordAt(PDU, 13, itemSize * list.size() + 2);           // Parameter Länge
+  //      S7Utility.SetWordAt(PDU, 23, itemSize);                           // Set Number of elements   
 
         //PDU[22] = 0x1D;
         try {
             sendRequest(PDU, lenToRead, outStream);
             length = RecvIsoPacket(inStream);
         } catch (TCPException ex) {
-            java.util.logging.Logger.getLogger(S7Client.class.getName()).log(java.util.logging.Level.SEVERE, null, ex);
+            logger.log(Level.SEVERE,"ISO Communication Error.",ex);
         }
 
         if (PDU[21] == (byte) 0xFF && length >= 25) {
@@ -278,9 +326,9 @@ public class S7Client extends S7Packet {
             }
 
         } catch (ISOException ex) {
-            logger.log(Level.ERROR, "ISO Communication Error.", ex);
+            logger.log(Level.SEVERE, "ISO Communication Error.", ex);
         } catch (IOException ex) {
-            logger.log(Level.ERROR, "TCP Connection Failed.", ex);
+            logger.log(Level.SEVERE, "TCP Connection Failed.", ex);
         }
         return blockinfo;
     }
@@ -371,10 +419,10 @@ public class S7Client extends S7Packet {
                     throw new ISOException("Receive invalid PDU in WriteArea.");
                 }
             } catch (ISOException ex) {
-                logger.log(Level.ERROR, "ISO Communication Error.", ex);
+                logger.log(Level.SEVERE, "ISO Communication Error.", ex);
                 return;
             } catch (IOException ex) {
-                logger.log(Level.ERROR, "TCP Connection Failed.", ex);
+                logger.log(Level.SEVERE, "TCP Connection Failed.", ex);
                 return;
             }
 
