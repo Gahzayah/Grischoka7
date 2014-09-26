@@ -6,6 +6,7 @@ import grischa.dev.moka7.client.S7Client;
 import grischa.dev.moka7.client.S7Utility;
 import java.io.IOException;
 
+
 /**
  *
  * @author mhi
@@ -18,13 +19,14 @@ public class main_s7client extends Thread {
         client.setConnectionParams(S7Utility.PG, 0, 2);
         client.connectTo("192.168.16.222", 0, 2);
 
+
         /*** START FUNCTIONSTEST ***/
         //client.serviceAbilityTest();
 
         /*** CONNECT TO DATABASE ***/
         S7Handler handler = new S7Handler();
-        handler.connectToDB();
-        handler.showTableModel("ProcessVars");
+    //    handler.connectToDB();
+    //    handler.showTableModel("ProcessVars");
 
         /*** READ PROCVARS FOR WORKER ***/
         //handler.readProcVars();
@@ -36,15 +38,15 @@ public class main_s7client extends Thread {
         S7Service service = new S7Service( handler , client );
        // service.readData();
         service.readMultivars();
- //       service.pollPLC();
+        service.pollPLC();
         /*** Start Polling **/
 
-            // readProcVars()
-        // readArea()
-        // readTasks()
-        // writeArea()
+//             readProcVars()
+//         readArea();
+//         readTasks()
+//         writeArea()
 //        Polling t1 = new Polling();
-////        Polling1 t2 = new Polling1(10);    
+//        Polling1 t2 = new Polling1(10);    
 //        t1.start();
 ////        t2.start();
 //        // Synchronized Requesting .. Blocking here

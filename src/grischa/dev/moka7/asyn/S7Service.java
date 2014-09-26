@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-
 /**
  *
  * @author MaHi
@@ -48,9 +47,9 @@ public class S7Service implements Runnable {
     public void pollPLC() {
         Boolean active = true;
         int counter = 0;
-
+        logger.log(Level.INFO, "Polling started..");
         while (active) {
-            logger.log(Level.INFO, "Polling started..");
+            logger.log(Level.INFO, "Tick..");
             counter++;
             try {
                 sleep(POLLING_FREQ);
@@ -59,7 +58,7 @@ public class S7Service implements Runnable {
                 logger.log(Level.SEVERE, "Sleep invoke an Error");
                 return;
             }
-            if (counter >= 10) {
+            if (counter >= 4) {
                 active = false;
             }
         }
@@ -71,47 +70,58 @@ public class S7Service implements Runnable {
     public void readData() {
         byte[] Buffer = new byte[65536];
         Buffer = client.ReadArea(S7Utility.S7AreaDB, 100);
+        StringBuilder output = new StringBuilder();
 
-//     System.out.println(client.bytesToHex(Buffer, 0, 12));
-        System.out.println("Value 1 (2 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 0, 2), 16));
-        System.out.println("Value 2 (2 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 2, 4), 16));
-        System.out.println("Value 3 (2 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 4, 6), 16));
-        System.out.println("Value 4 (4 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 6, 10), 16));
-        System.out.println("Value 5 (4 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 10, 12), 16));
+        output.append("Value 1 (2 bytes): ");
+        output.append("" + Integer.parseInt(client.bytesToHex(Buffer, 0, 2), 16) + "\n");
+        output.append("Value 2 (2 bytes): ");
+        output.append("" + Integer.parseInt(client.bytesToHex(Buffer, 2, 4), 16) + "\n");
+        output.append("Value 3 (2 bytes): ");
+        output.append("" + Integer.parseInt(client.bytesToHex(Buffer, 4, 6), 16) + "\n");
+        output.append("Value 4 (4 bytes): ");
+        output.append("" + Integer.parseInt(client.bytesToHex(Buffer, 6, 10), 16) + "\n");
+        output.append("Value 5 (4 bytes): ");
+        output.append("" + Integer.parseInt(client.bytesToHex(Buffer, 10, 12), 16) + "\r\n");
+        
+        System.out.print(output);
+
+////     System.out.println(client.bytesToHex(Buffer, 0, 12));
+//        System.out.println("Value 1 (2 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 0, 2), 16));
+//        System.out.println("Value 2 (2 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 2, 4), 16));
+//        System.out.println("Value 3 (2 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 4, 6), 16));
+//        System.out.println("Value 4 (4 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 6, 10), 16));
+//        System.out.println("Value 5 (4 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 10, 12), 16));
     }
-    
-        @SuppressWarnings("static-access")
+
+    @SuppressWarnings("static-access")
     public void readMultivars() throws IOException {
         byte[] Buffer = new byte[65536];
         ArrayList<S7Item> source = null;
         ArrayList<S7Item> destin = null;
         // Read Processvariabeln
         //handler.readProcVars();
-        
+
         // Fill up List for Polling
-        for(int i= 1 ; i <=13 ; i++){
+        for (int i = 1; i <= 13; i++) {
             destin = new ArrayList();
             destin.add(new S7Item(100, 0, 12));
-         }
+        }
         // Read Data from PLC
-        
+
         long start = System.currentTimeMillis();
         Buffer = client.readMuliVars(S7Utility.S7AreaDB, destin);
         long end = System.currentTimeMillis();
-        
 
-     System.out.println(client.bytesToHex(Buffer, 0, 36));
+        System.out.println(client.bytesToHex(Buffer, 0, 36));
         System.out.println("Value 1 (2 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 0, 2), 16));
         System.out.println("Value 2 (2 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 2, 4), 16));
         System.out.println("Value 3 (2 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 4, 6), 16));
         System.out.println("Value 4 (4 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 6, 10), 16));
         System.out.println("Value 5 (4 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 10, 12), 16));
-        
 
-       System.out.println("Value 3 (2 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 16, 18), 16));
-       System.out.println("Execution Time = " + (end-start));
+        System.out.println("Value 3 (2 bytes): " + Integer.parseInt(client.bytesToHex(Buffer, 16, 18), 16));
+        System.out.println("Execution Time = " + (end - start));
 
-                
     }
 
     public void setWriteAreaTask(ArrayList<ProcVars> wpv) {
